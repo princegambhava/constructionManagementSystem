@@ -29,7 +29,7 @@ const Auth = () => {
           phone,
         });
       } else {
-        await login({ email, password });
+        await login(email, password);
       }
 
       navigate("/");

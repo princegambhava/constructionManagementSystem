@@ -24,6 +24,14 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, [token]);
 
+  const register = async (userData) => {
+    const data = await authService.register(userData);
+    setUser(data.user);
+    setToken(data.token);
+    localStorage.setItem('token', data.token);
+    return data;
+  };
+
   const login = async (email, password) => {
     const data = await authService.login(email, password);
     setUser(data.user);
@@ -38,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  const value = useMemo(() => ({ user, token, login, logout, loading }), [user, token, loading]);
+  const value = useMemo(() => ({ user, token, register, login, logout, loading }), [user, token, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

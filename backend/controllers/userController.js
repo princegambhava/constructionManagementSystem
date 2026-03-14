@@ -309,11 +309,62 @@ const addWorkerByContractor = async (req, res) => {
   }
 };
 
+const updateWorkerSalary = async (req, res) => {
+  try {
+    const { workerId, dailyWage } = req.body;
+    
+    console.log('Update salary request:', { workerId, dailyWage });
+
+    // Validate required fields
+    if (!workerId || !dailyWage) {
+      return res.status(400).json({ message: 'Worker ID and daily wage are required' });
+    }
+
+    // Validate daily wage is a positive number
+    if (isNaN(dailyWage) || Number(dailyWage) <= 0) {
+      return res.status(400).json({ message: 'Daily wage must be a positive number' });
+    }
+
+    // Find and update the worker
+    const { ObjectId } = require('mongoose').Types;
+    const worker = await User.findOne({ _id: new ObjectId(workerId), role: 'worker' });
+    
+    console.log('Found worker:', worker);
+    
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+
+    // Update the daily wage
+    worker.dailyWage = Number(dailyWage);
+    await worker.save();
+
+    console.log('Updated worker:', worker);
+
+    res.status(200).json({
+      message: 'Worker salary updated successfully',
+      worker: {
+        id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        dailyWage: worker.dailyWage,
+        role: worker.role,
+        isAvailable: worker.isAvailable
+      }
+    });
+  } catch (error) {
+    console.error('Error updating worker salary:', error);
+    res.status(500).json({ message: 'Failed to update worker salary' });
+  }
+};
+
 module.exports = { 
   getUsers, 
   getWorkerAnalytics,
   getWorkerById,
-  addWorkerByContractor
+  addWorkerByContractor,
+  updateWorkerSalary
 };
 
 

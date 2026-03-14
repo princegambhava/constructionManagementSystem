@@ -43,6 +43,13 @@ const googleAuth = async (req, res) => {
     });
 
     if (user) {
+      // Reject worker authentication attempts for existing users
+      if (user.role === 'worker') {
+        return res.status(403).json({ 
+          message: 'Workers cannot login. Workers are managed by contractors.' 
+        });
+      }
+      
       // Update user if they don't have googleId
       if (!user.googleId) {
         user.googleId = googleId;
@@ -50,9 +57,16 @@ const googleAuth = async (req, res) => {
         await user.save();
       }
     } else {
-      // Create new user
-      const allowedRoles = ['worker', 'contractor', 'site_manager', 'engineer'];
-      const userRole = role && allowedRoles.includes(role) ? role : 'worker';
+      // Create new user - Workers cannot create accounts
+      const allowedRoles = ['contractor', 'site_manager', 'engineer'];
+      const userRole = role && allowedRoles.includes(role) ? role : 'contractor';
+      
+      // Reject worker authentication attempts
+      if (role === 'worker') {
+        return res.status(403).json({ 
+          message: 'Workers cannot create accounts. Workers are added by contractors through the contractor dashboard.' 
+        });
+      }
       
       user = await User.create({
         name,
@@ -108,9 +122,17 @@ const signupUser = async (req, res) => {
     return res.status(400).json({ message: 'Please provide name, email, and password' });
   }
 
-  // Only allow specific roles for public signup
-  const allowedRoles = ['worker', 'contractor', 'site_manager', 'engineer'];
-  const userRole = role && allowedRoles.includes(role) ? role : 'worker';
+  // Only allow specific roles for public signup (no workers)
+  const allowedRoles = ['contractor', 'site_manager', 'engineer'];
+  
+  // Reject worker authentication attempts
+  if (role === 'worker') {
+    return res.status(403).json({ 
+      message: 'Workers cannot create accounts. Workers are added by contractors through the contractor dashboard.' 
+    });
+  }
+  
+  const userRole = role && allowedRoles.includes(role) ? role : 'contractor';
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -181,6 +203,13 @@ const loginUser = async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) {
     return res.status(401).json({ message: 'Invalid credentials' });
+  }
+
+  // Reject worker login attempts
+  if (user.role === 'worker') {
+    return res.status(403).json({ 
+      message: 'Workers cannot login. Workers are managed by contractors.' 
+    });
   }
 
   const isMatch = await user.matchPassword(password);

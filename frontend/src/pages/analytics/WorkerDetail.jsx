@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Loader from '../../components/Loader';
 import workerAnalyticsService from '../../services/workerAnalyticsService';
+import { formatINR } from '../../utils/currency';
 
 const WorkerDetail = () => {
   const { id } = useParams();
@@ -228,7 +229,7 @@ const WorkerDetail = () => {
           </div>
           <div>
             <div className="text-sm text-gray-500">Daily Wage</div>
-            <div className="font-medium">${workerData.worker.dailyWage}</div>
+            <div className="font-medium">{formatINR(workerData.worker.dailyWage)}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Join Date</div>
@@ -271,7 +272,7 @@ const WorkerDetail = () => {
           <div className="text-xs text-gray-500 mt-1">In Progress</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-purple-600">${workerData.performance.totalEarnings}</div>
+          <div className="text-2xl font-bold text-purple-600">{formatINR(workerData.performance.totalEarnings)}</div>
           <div className="text-xs text-gray-500 mt-1">Total Earnings</div>
         </div>
       </div>

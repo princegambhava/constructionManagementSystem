@@ -20,7 +20,7 @@ const router = express.Router();
 router.post(
   '/',
   protect,
-  authorizeRoles('admin', 'engineer'),
+  authorizeRoles('admin', 'engineer', 'contractor'),
   validate([body('name').notEmpty().withMessage('Name is required')]),
   createProject
 );

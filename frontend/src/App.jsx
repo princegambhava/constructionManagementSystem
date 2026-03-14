@@ -9,7 +9,6 @@ import ContractorDashboard from './pages/contractor/ContractorDashboard';
 import Dashboard from './pages/Dashboard';
 import EngineerDashboard from './pages/engineer/EngineerDashboard';
 import Equipment from './pages/Equipment';
-import Materials from './pages/Materials';
 import NotFound from './pages/NotFound';
 import Projects from './pages/Projects';
 import Reports from './pages/Reports';
@@ -51,7 +50,6 @@ const App = () => {
               {user?.role !== 'worker' && user?.role !== 'contractor' && user?.role !== 'engineer' && (
                 <>
                   <Link to="/projects" className="hover:text-blue-600 transition-colors">Projects</Link>
-                  <Link to="/materials" className="hover:text-blue-600 transition-colors">Materials</Link>
                   <Link to="/attendance" className="hover:text-blue-600 transition-colors">Attendance</Link>
                   <Link to="/reports" className="hover:text-blue-600 transition-colors">Reports</Link>
                 </>
@@ -114,7 +112,6 @@ const App = () => {
           <Route path="/site-manager-dashboard" element={<ProtectedRoute><SiteManagerDashboard /></ProtectedRoute>} />
           
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-          <Route path="/materials" element={<ProtectedRoute><Materials /></ProtectedRoute>} />
           <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
           <Route path="/equipment" element={<ProtectedRoute><Equipment /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

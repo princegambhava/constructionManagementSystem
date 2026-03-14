@@ -4,8 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import invoiceService from '../../services/invoiceService';
 import projectService from '../../services/projectService';
 import workerService from '../../services/workerService';
+import materialRequestService from '../../services/materialRequestService';
+import { formatINR } from '../../utils/currency';
 
-const TABS = ['Global Overview', 'Approvals', 'Financials'];
+const TABS = ['Global Overview', 'Material Requests', 'Approvals', 'Financials'];
 
 const SiteManagerDashboard = () => {
   const { user } = useAuth();
@@ -16,6 +18,22 @@ const SiteManagerDashboard = () => {
   const [projects, setProjects] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [workers, setWorkers] = useState([]); // To track total workforce
+  const [materialRequests, setMaterialRequests] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+
+  // Form states
+  const [newMaterialRequest, setNewMaterialRequest] = useState({
+    title: '',
+    description: '',
+    materialType: 'raw_materials',
+    quantity: '',
+    unit: 'pieces',
+    urgency: 'medium',
+    project: '',
+    estimatedDelivery: '',
+    notes: '',
+    budget: ''
+  });
 
   useEffect(() => {
     fetchData();
@@ -24,16 +42,18 @@ const SiteManagerDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [projectsRes, invoicesRes, workersRes] = await Promise.all([
+      const [projectsRes, invoicesRes, workersRes, materialRequestsRes] = await Promise.all([
         projectService.getProjects(),
         invoiceService.getInvoices(),
-        workerService.getWorkers() 
+        workerService.getWorkers(),
+        materialRequestService.getMaterialRequests()
       ]);
       setProjects(projectsRes.data || projectsRes);
-      setInvoices(invoicesRes);
+      setInvoices(invoicesRes.data || invoicesRes);
       setWorkers(workersRes.data || workersRes);
+      setMaterialRequests(materialRequestsRes.data || materialRequestsRes);
     } catch (error) {
-      console.error(error);
+      console.error("Error fetching dashboard data", error);
     } finally {
       setLoading(false);
     }
@@ -46,19 +66,54 @@ const SiteManagerDashboard = () => {
       fetchData();
     } catch (error) {
       console.error(error);
-      alert('Approval failed');
+      alert('Failed to approve invoice');
+    }
+  };
+
+  const handleCreateMaterialRequest = async (e) => {
+    e.preventDefault();
+    try {
+      await materialRequestService.createMaterialRequest(newMaterialRequest);
+      alert('Material Request Created Successfully!');
+      setNewMaterialRequest({
+        title: '',
+        description: '',
+        materialType: 'raw_materials',
+        quantity: '',
+        unit: 'pieces',
+        urgency: 'medium',
+        project: '',
+        estimatedDelivery: '',
+        notes: '',
+        budget: ''
+      });
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to create material request');
+    }
+  };
+
+  const handleUpdateRequestStatus = async (requestId, status) => {
+    try {
+      await materialRequestService.updateMaterialRequestStatus(requestId, { status });
+      alert(`Request ${status} successfully!`);
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to update request status');
     }
   };
 
   const handleRejectInvoice = async (id) => {
     try {
-        await invoiceService.updateInvoice(id, { status: 'Rejected' });
-        alert('Invoice Rejected');
-        fetchData();
-      } catch (error) {
-        console.error(error);
-        alert('Rejection failed');
-      }
+      await invoiceService.updateInvoice(id, { status: 'Rejected' });
+      alert('Invoice Rejected');
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      alert('Rejection failed');
+    }
   };
 
   if (loading) return <div className="flex justify-center p-20"><Loader /></div>;
@@ -99,11 +154,11 @@ const SiteManagerDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="glass-panel p-6 border-b-4 border-blue-600">
                 <h3 className="text-gray-500 text-sm uppercase font-bold mb-2">Total Budget</h3>
-                <p className="text-3xl font-bold text-gray-900">${totalBudget.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-gray-900">{formatINR(totalBudget)}</p>
                 </div>
                 <div className="glass-panel p-6 border-b-4 border-emerald-500">
                 <h3 className="text-gray-500 text-sm uppercase font-bold mb-2">Spent to Date</h3>
-                <p className="text-3xl font-bold text-emerald-600">${totalSpent.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-emerald-600">{formatINR(totalSpent)}</p>
                 </div>
                 <div className="glass-panel p-6 border-b-4 border-blue-400">
                 <h3 className="text-gray-500 text-sm uppercase font-bold mb-2">Active Projects</h3>
@@ -157,7 +212,7 @@ const SiteManagerDashboard = () => {
                                     <p className="text-sm text-gray-500">Submitted by: {inv.contractor?.name}</p>
                                     <p className="text-xs text-gray-400 mt-1">{new Date(inv.createdAt).toDateString()}</p>
                                 </div>
-                                <span className="text-2xl font-bold text-gray-900">${inv.amount}</span>
+                                <span className="text-2xl font-bold text-gray-900">{formatINR(inv.amount)}</span>
                             </div>
                             
                             {inv.description && <p className="text-sm text-gray-600 mb-4 bg-gray-50 p-2 rounded">{inv.description}</p>}
@@ -181,9 +236,296 @@ const SiteManagerDashboard = () => {
                 </div>
              </div>
              
-             <div className="glass-panel p-6 h-fit opacity-75">
+             <div className="glass-panel p-6 h-fit">
                  <h2 className="text-xl font-bold text-gray-800 mb-4">Material Requests</h2>
                  <p className="text-gray-400 text-center py-10">No pending requests.</p>
+             </div>
+           </div>
+         )}
+
+         {/* MATERIAL REQUESTS TAB */}
+         {activeTab === 'Material Requests' && (
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             {/* Create New Request */}
+             <div className="glass-card h-fit">
+               <h2 className="text-xl font-bold text-gray-800 mb-4">Create Material Request</h2>
+               <form onSubmit={handleCreateMaterialRequest} className="space-y-4">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Request Title *</label>
+                   <input 
+                     type="text" 
+                     placeholder="e.g., Cement for Foundation"
+                     value={newMaterialRequest.title}
+                     onChange={e => setNewMaterialRequest({...newMaterialRequest, title: e.target.value})}
+                     className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                     required
+                   />
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Material Type *</label>
+                     <select 
+                       value={newMaterialRequest.materialType}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, materialType: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                       required
+                     >
+                       <option value="raw_materials">Raw Materials</option>
+                       <option value="equipment">Equipment</option>
+                       <option value="tools">Tools</option>
+                       <option value="safety">Safety Equipment</option>
+                       <option value="electrical">Electrical</option>
+                       <option value="plumbing">Plumbing</option>
+                       <option value="finishing">Finishing Materials</option>
+                     </select>
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Urgency</label>
+                     <select 
+                       value={newMaterialRequest.urgency}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, urgency: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                     >
+                       <option value="low">Low</option>
+                       <option value="medium">Medium</option>
+                       <option value="high">High</option>
+                       <option value="urgent">Urgent</option>
+                     </select>
+                   </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
+                     <input 
+                       type="number" 
+                       placeholder="e.g., 100"
+                       value={newMaterialRequest.quantity}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, quantity: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                       required
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
+                     <select 
+                       value={newMaterialRequest.unit}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, unit: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                       required
+                     >
+                       <option value="kg">Kilograms (kg)</option>
+                       <option value="tons">Tons</option>
+                       <option value="pieces">Pieces</option>
+                       <option value="boxes">Boxes</option>
+                       <option value="liters">Liters</option>
+                       <option value="meters">Meters</option>
+                       <option value="sqft">Square Feet</option>
+                     </select>
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                   <textarea 
+                     placeholder="Detailed description of material requirements..."
+                     rows="3"
+                     value={newMaterialRequest.description}
+                     onChange={e => setNewMaterialRequest({...newMaterialRequest, description: e.target.value})}
+                     className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                   ></textarea>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
+                     <select 
+                       value={newMaterialRequest.project}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, project: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                     >
+                       <option value="">Select Project</option>
+                       {projects && projects.map(project => (
+                         <option key={project._id} value={project._id}>{project.name}</option>
+                       ))}
+                     </select>
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Delivery</label>
+                     <input 
+                       type="date" 
+                       value={newMaterialRequest.estimatedDelivery}
+                       onChange={e => setNewMaterialRequest({...newMaterialRequest, estimatedDelivery: e.target.value})}
+                       className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                     />
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Budget (₹)</label>
+                   <input 
+                     type="number" 
+                     placeholder="e.g., 50000"
+                     value={newMaterialRequest.budget}
+                     onChange={e => setNewMaterialRequest({...newMaterialRequest, budget: e.target.value})}
+                     className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                   />
+                 </div>
+
+                 <button type="submit" className="btn btn-primary w-full">Create Request</button>
+               </form>
+             </div>
+
+             {/* Material Requests List */}
+             <div className="lg:col-span-2 space-y-6">
+               <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-xl font-bold text-gray-800">All Material Requests</h2>
+                 <div className="flex gap-2">
+                   <select 
+                     onChange={(e) => {
+                       // Filter functionality can be added here
+                     }}
+                     className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                   >
+                     <option value="">All Status</option>
+                     <option value="pending">Pending</option>
+                     <option value="approved">Approved</option>
+                     <option value="ordered">Ordered</option>
+                     <option value="delivered">Delivered</option>
+                     <option value="completed">Completed</option>
+                   </select>
+                 </div>
+               </div>
+
+               {(!materialRequests || materialRequests.length === 0) ? (
+                 <div className="glass-card p-12 text-center">
+                   <div className="text-gray-400 text-lg mb-4">No material requests found</div>
+                   <p className="text-gray-500">Create your first material request to get started</p>
+                 </div>
+               ) : (
+                 <div className="space-y-4">
+                   {materialRequests && materialRequests.map(request => (
+                     <div key={request._id} className="glass-card p-6 hover:shadow-lg transition-shadow">
+                       <div className="flex justify-between items-start mb-4">
+                         <div>
+                           <h3 className="text-lg font-bold text-gray-800">{request.title}</h3>
+                           <p className="text-sm text-gray-500">
+                             Requested by: {request.requestedBy?.name} • {new Date(request.createdAt).toLocaleDateString()}
+                           </p>
+                         </div>
+                         <span className={`px-3 py-1 text-xs rounded-full font-medium ${
+                           request.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                           request.status === 'approved' ? 'bg-blue-100 text-blue-600' :
+                           request.status === 'ordered' ? 'bg-purple-100 text-purple-600' :
+                           request.status === 'delivered' ? 'bg-green-100 text-green-600' :
+                           'bg-gray-100 text-gray-600'
+                         }`}>
+                           {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                         </span>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                         <div>
+                           <span className="text-sm text-gray-600">Material Type:</span>
+                           <span className="font-medium">{request.materialType?.replace('_', ' ').charAt(0).toUpperCase() + request.materialType?.replace('_', ' ').slice(1)}</span>
+                         </div>
+                         <div>
+                           <span className="text-sm text-gray-600">Quantity:</span>
+                           <span className="font-medium">{request.quantity} {request.unit}</span>
+                         </div>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                         <div>
+                           <span className="text-sm text-gray-600">Urgency:</span>
+                           <span className={`font-medium ${
+                             request.urgency === 'urgent' ? 'text-red-600' :
+                             request.urgency === 'high' ? 'text-orange-600' :
+                             request.urgency === 'medium' ? 'text-yellow-600' :
+                             'text-green-600'
+                           }`}>
+                             {request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1)}
+                           </span>
+                         </div>
+                         <div>
+                           <span className="text-sm text-gray-600">Project:</span>
+                           <span className="font-medium">{request.project?.name || 'N/A'}</span>
+                         </div>
+                       </div>
+
+                       {request.description && (
+                         <div className="mb-4">
+                           <span className="text-sm text-gray-600">Description:</span>
+                           <p className="text-gray-700 bg-gray-50 p-3 rounded mt-1">{request.description}</p>
+                         </div>
+                       )}
+
+                       {request.estimatedDelivery && (
+                         <div className="mb-4">
+                           <span className="text-sm text-gray-600">Estimated Delivery:</span>
+                           <span className="font-medium">{new Date(request.estimatedDelivery).toLocaleDateString()}</span>
+                         </div>
+                       )}
+
+                       {request.budget && (
+                         <div className="mb-4">
+                           <span className="text-sm text-gray-600">Budget:</span>
+                           <span className="font-bold text-green-600">{formatINR(request.budget)}</span>
+                         </div>
+                       )}
+
+                       <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                         <div className="text-sm text-gray-500">
+                           {request.assignedContractor ? `Assigned to: ${request.assignedContractor?.name}` : 'Not assigned'}
+                         </div>
+                         <div className="flex gap-2">
+                           {request.status === 'pending' && (
+                             <>
+                               <button 
+                                 onClick={() => handleUpdateRequestStatus(request._id, 'approved')}
+                                 className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                               >
+                                 Approve
+                               </button>
+                               <button 
+                                 onClick={() => handleUpdateRequestStatus(request._id, 'rejected')}
+                                 className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                               >
+                                 Reject
+                               </button>
+                             </>
+                           )}
+                           {request.status === 'approved' && (
+                             <button 
+                               onClick={() => handleUpdateRequestStatus(request._id, 'ordered')}
+                               className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                             >
+                               Mark Ordered
+                             </button>
+                           )}
+                           {request.status === 'ordered' && (
+                             <button 
+                               onClick={() => handleUpdateRequestStatus(request._id, 'delivered')}
+                               className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                             >
+                               Mark Delivered
+                             </button>
+                           )}
+                           {request.status === 'delivered' && (
+                             <button 
+                               onClick={() => handleUpdateRequestStatus(request._id, 'completed')}
+                               className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+                             >
+                               Mark Completed
+                             </button>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
              </div>
            </div>
          )}
@@ -214,7 +556,7 @@ const SiteManagerDashboard = () => {
                                          inv.status === 'Rejected' ? 'text-red-600' : 'text-amber-600'
                                      }`}>{inv.status}</span>
                                  </td>
-                                 <td className="py-3 text-right font-mono text-gray-700">${inv.amount}</td>
+                                 <td className="py-3 text-right font-mono text-gray-700">{formatINR(inv.amount)}</td>
                              </tr>
                          ))}
                      </tbody>

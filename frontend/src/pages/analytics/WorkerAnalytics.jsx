@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Loader from '../../components/Loader';
 import workerAnalyticsService from '../../services/workerAnalyticsService';
+import { formatINR } from '../../utils/currency';
 
 const WorkerAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);
@@ -161,7 +162,7 @@ const WorkerAnalytics = () => {
           <div className="text-xs text-gray-500 mt-1">Total Tasks</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-pink-600">${analytics.overview.averageWage.toFixed(0)}</div>
+          <div className="text-2xl font-bold text-pink-600">{formatINR(analytics.overview.averageWage.toFixed(0))}</div>
           <div className="text-xs text-gray-500 mt-1">Avg Daily Wage</div>
         </div>
       </div>

@@ -24,20 +24,43 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, [token]);
 
+  const googleLogin = async (googleToken) => {
+    try {
+      const data = await authService.googleLogin(googleToken);
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem('token', data.token);
+      return data;
+    } catch (error) {
+      console.error('Google login error in context:', error);
+      throw error;
+    }
+  };
+
   const register = async (userData) => {
-    const data = await authService.register(userData);
-    setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem('token', data.token);
-    return data;
+    try {
+      const data = await authService.register(userData);
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem('token', data.token);
+      return data;
+    } catch (error) {
+      console.error('Register error in context:', error);
+      throw error;
+    }
   };
 
   const login = async (email, password) => {
+    try {
     const data = await authService.login(email, password);
     setUser(data.user);
     setToken(data.token);
     localStorage.setItem('token', data.token);
     return data;
+    } catch (error) {
+      console.error('Login error in context:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
@@ -46,7 +69,20 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  const value = useMemo(() => ({ user, token, register, login, logout, loading }), [user, token, loading]);
+  const signup = async (userData) => {
+    try {
+      const data = await authService.signup(userData);
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem('token', data.token);
+      return data;
+    } catch (error) {
+      console.error('Signup error in context:', error);
+      throw error;
+    }
+  };
+
+  const value = useMemo(() => ({ user, token, googleLogin, register, login, logout, loading, signup }), [user, token, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

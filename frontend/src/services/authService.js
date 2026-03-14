@@ -1,13 +1,25 @@
 import api from './api';
 
 export const authService = {
-  // PUBLIC SIGNUP
+  // GOOGLE OAUTH LOGIN/SIGNUP
+  googleLogin: async (googleToken, role) => {
+    const response = await api.post('/auth/google', { token: googleToken, role });
+    return response.data;
+  },
+
+  // EMAIL/PASSWORD SIGNUP
   register: async (userData) => {
     const response = await api.post('/auth/signup', userData);
     return response.data;
   },
 
-  // LOGIN
+  // PUBLIC SIGNUP WITH ROLE
+  signup: async (userData) => {
+    const response = await api.post('/auth/signup', userData);
+    return response.data;
+  },
+
+  // EMAIL/PASSWORD LOGIN
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     return response.data;

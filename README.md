@@ -36,6 +36,8 @@ Create/update `backend/.env` file:
 PORT=5000
 MONGO_URI=your_mongodb_connection_string_here
 JWT_SECRET=your_jwt_secret_key_here
+GOOGLE_CLIENT_ID=your_google_client_id_here
+NODE_ENV=development
 ```
 
 **How to get MongoDB connection string:**
@@ -64,7 +66,10 @@ Create/update `frontend/.env` file:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 ```
+
+**Note:** For Google OAuth setup, see [SETUP_GOOGLE_OAUTH.md](./SETUP_GOOGLE_OAUTH.md) or [GOOGLE_OAUTH_QUICK_FIX.md](./GOOGLE_OAUTH_QUICK_FIX.md)
 
 ### Step 3: Run the Application
 
@@ -121,6 +126,7 @@ Since registration requires admin privileges, you need to create the first admin
 ```
 
 ### Option 2: Using a Script (Recommended)
+
 
 Create `backend/scripts/createAdmin.js`:
 
@@ -222,6 +228,24 @@ projectCursor/
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 
+## 🔐 Google OAuth Setup (Optional but Recommended)
+
+This project supports Google Sign-In for easy authentication. To enable it:
+
+### Quick Setup (5 minutes)
+See **[GOOGLE_OAUTH_QUICK_FIX.md](./GOOGLE_OAUTH_QUICK_FIX.md)** for a quick 5-minute setup guide.
+
+### Complete Setup Guide
+See **[SETUP_GOOGLE_OAUTH.md](./SETUP_GOOGLE_OAUTH.md)** for detailed step-by-step instructions.
+
+### Verify Your Setup
+Run the verification script:
+```bash
+node verify-google-oauth.js
+```
+
+**Note:** Google OAuth is optional. You can still use email/password authentication without it.
+
 ## 🐛 Troubleshooting
 
 ### MongoDB Connection Error
@@ -237,6 +261,13 @@ projectCursor/
 - Verify `VITE_API_URL` in `frontend/.env` matches backend port
 - Check CORS settings in `backend/server.js`
 - Ensure backend is running
+
+### Google OAuth "Error 401: invalid_client"
+- Check if `GOOGLE_CLIENT_ID` is set in `backend/.env`
+- Check if `VITE_GOOGLE_CLIENT_ID` is set in `frontend/.env`
+- Both must use the **same** Client ID from Google Cloud Console
+- Restart both servers after updating `.env` files
+- See [GOOGLE_OAUTH_QUICK_FIX.md](./GOOGLE_OAUTH_QUICK_FIX.md) for detailed troubleshooting
 
 ### Images Not Loading
 - Check if `backend/uploads/reports/` directory exists

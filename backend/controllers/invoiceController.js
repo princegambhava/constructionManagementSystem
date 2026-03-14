@@ -29,23 +29,45 @@ const getInvoices = async (req, res) => {
 // @access  Private (Contractor)
 const createInvoice = async (req, res) => {
   try {
-    const { title, amount, description, imageUrl, projectId } = req.body;
+    const { title, amount, description, base64Data, fileName, fileType, fileSize, projectId } = req.body;
 
-    if (!title || !amount || !imageUrl) {
-      return res.status(400).json({ message: 'Please provide title, amount, and image' });
+    console.log('Creating invoice with Base64 data');
+
+    if (!title || !amount) {
+      return res.status(400).json({ message: 'Please provide title and amount' });
+    }
+
+    if (!base64Data) {
+      return res.status(400).json({ message: 'Please upload a file (image or PDF)' });
+    }
+
+    // Validate Base64 data format
+    if (!base64Data.startsWith('data:image/') && !base64Data.startsWith('data:application/pdf')) {
+      return res.status(400).json({ message: 'Invalid file format. Only images and PDFs are allowed.' });
+    }
+
+    // Check file size (Base64 string length gives approximate size)
+    const base64Size = Math.round((base64Data.length * 3) / 4); // Convert Base64 length to approximate bytes
+    if (base64Size > 5 * 1024 * 1024) { // 5MB limit
+      return res.status(400).json({ message: 'File size too large. Maximum size is 5MB.' });
     }
 
     const invoice = await Invoice.create({
       title,
       amount,
       description,
-      imageUrl,
+      base64Data,
+      fileName: fileName || 'invoice',
+      fileType: fileType || 'unknown',
+      fileSize: fileSize || base64Size,
       project: projectId,
       contractor: req.user._id
     });
 
+    console.log('Invoice created successfully with Base64 data');
     res.status(201).json(invoice);
   } catch (error) {
+    console.error('Error creating invoice:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -29,7 +29,7 @@ const ContractorDashboard = () => {
   // Form States
   const [newTask, setNewTask] = useState({ title: '', description: '', assignedTo: '', priority: 'Medium', dueDate: '', siteLocation: '' });
   const [newWorker, setNewWorker] = useState({ name: '', email: '', password: 'worker123', phone: '', dailyWage: '' });
-  const [newInvoice, setNewInvoice] = useState({ title: '', amount: '', description: '', imageUrl: '' });
+  const [newInvoice, setNewInvoice] = useState({ title: '', amount: '', description: '', invoiceFile: null });
   const [newProject, setNewProject] = useState({ 
     projectId: '', 
     name: '', 
@@ -106,16 +106,44 @@ const ContractorDashboard = () => {
 
   const handleCreateInvoice = async (e) => {
     e.preventDefault();
-    if (!newInvoice.imageUrl) return alert('Please provide an image URL');
-    try {
-      await invoiceService.createInvoice({ ...newInvoice, projectId: user.projectId || '60d0fe4f5311236168a109ca' }); // Mock project ID fallback
-      alert('Invoice Uploaded!');
-      setNewInvoice({ title: '', amount: '', description: '', imageUrl: '' });
-      fetchData();
-    } catch (error) {
-       console.error(error);
-       alert('Failed to upload invoice');
-    }
+    if (!newInvoice.invoiceFile) return alert('Please select a file to upload');
+    
+    // Convert file to Base64
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target.result;
+      const fileName = newInvoice.invoiceFile.name;
+      const fileType = newInvoice.invoiceFile.type;
+      const fileSize = newInvoice.invoiceFile.size;
+      
+      try {
+        const invoiceData = {
+          title: newInvoice.title,
+          amount: newInvoice.amount,
+          description: newInvoice.description,
+          base64Data,
+          fileName,
+          fileType,
+          fileSize
+        };
+        
+        if (user.projectId) invoiceData.projectId = user.projectId;
+        
+        await invoiceService.createInvoice(invoiceData);
+        alert('Invoice Uploaded Successfully!');
+        setNewInvoice({ title: '', amount: '', description: '', invoiceFile: null });
+        fetchData();
+      } catch (error) {
+        console.error(error);
+        alert('Failed to upload invoice');
+      }
+    };
+    
+    reader.onerror = () => {
+      alert('Failed to read file');
+    };
+    
+    reader.readAsDataURL(newInvoice.invoiceFile);
   };
 
   const handleCreateProject = async (e) => {
@@ -319,9 +347,8 @@ const ContractorDashboard = () => {
                   required 
                 />
                 <input 
-                  type="email" placeholder="Email Address" 
+                  type="email" placeholder="Email Address (Optional)" 
                   value={newWorker.email} onChange={e => setNewWorker({...newWorker, email: e.target.value})}
-                  required 
                 />
                 <input 
                   type="text" placeholder="Phone Number" 
@@ -378,7 +405,7 @@ const ContractorDashboard = () => {
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-900">{worker.name}</h4>
-                      <p className="text-sm text-gray-500">{worker.phone} • {worker.email}</p>
+                      <p className="text-sm text-gray-500">{worker.phone} • {worker.email || 'No email'}</p>
                       <p className="text-sm text-gray-600">Daily Wage: {formatINR(worker.dailyWage || 0)}</p>
                     </div>
                   </div>
@@ -466,11 +493,24 @@ const ContractorDashboard = () => {
                   value={newInvoice.amount} onChange={e => setNewInvoice({...newInvoice, amount: e.target.value})}
                   required 
                 />
-                <input 
-                  type="text" placeholder="Image URL (e.g. from cloud storage)" 
-                  value={newInvoice.imageUrl} onChange={e => setNewInvoice({...newInvoice, imageUrl: e.target.value})}
-                  required 
-                />
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <input 
+                    type="file" 
+                    id="invoiceFile"
+                    accept="image/*,.pdf" 
+                    onChange={e => setNewInvoice({...newInvoice, invoiceFile: e.target.files[0]})}
+                    className="hidden"
+                  />
+                  <label htmlFor="invoiceFile" className="cursor-pointer flex flex-col items-center">
+                    <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-sm text-gray-600">
+                      {newInvoice.invoiceFile ? newInvoice.invoiceFile.name : 'Click to upload invoice file'}
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">Images or PDF only (Max 5MB)</span>
+                  </label>
+                </div>
                  <textarea 
                   placeholder="Additional Notes" rows="2"
                   value={newInvoice.description} onChange={e => setNewInvoice({...newInvoice, description: e.target.value})}

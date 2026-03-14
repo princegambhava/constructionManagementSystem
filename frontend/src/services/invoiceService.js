@@ -6,6 +6,7 @@ const getInvoices = async () => {
 };
 
 const createInvoice = async (invoiceData) => {
+  // Send as regular JSON with Base64 data
   const response = await api.post('/invoices', invoiceData);
   return response.data;
 };

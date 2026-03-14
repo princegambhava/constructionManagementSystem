@@ -27,9 +27,21 @@ const invoiceSchema = new mongoose.Schema({
   description: {
     type: String
   },
-  imageUrl: {
+  base64Data: {
     type: String,
-    required: [true, 'Please upload an image of the bill']
+    required: [true, 'Please upload an image or PDF of the invoice']
+  },
+  fileName: {
+    type: String,
+    required: true
+  },
+  fileType: {
+    type: String,
+    required: true
+  },
+  fileSize: {
+    type: Number,
+    required: true
   },
   date: {
     type: Date,

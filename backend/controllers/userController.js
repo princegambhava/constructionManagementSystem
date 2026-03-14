@@ -267,15 +267,17 @@ const addWorkerByContractor = async (req, res) => {
   try {
     const { name, email, phone, dailyWage, password } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !phone || !dailyWage) {
-      return res.status(400).json({ message: 'Please provide name, email, phone, and daily wage' });
+    // Validate required fields - email is optional for workers
+    if (!name || !phone || !dailyWage) {
+      return res.status(400).json({ message: 'Please provide name, phone, and daily wage' });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ message: 'User with this email already exists' });
+    // Check if user already exists (only if email is provided)
+    if (email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({ message: 'User with this email already exists' });
+      }
     }
 
     // Create worker with default password if not provided
@@ -283,7 +285,7 @@ const addWorkerByContractor = async (req, res) => {
 
     const worker = await User.create({
       name,
-      email,
+      email: email || null, // Allow null email for workers
       password: workerPassword,
       role: 'worker',
       phone,

@@ -6,7 +6,16 @@ const roles = ['admin', 'engineer', 'contractor', 'site_manager', 'worker'];
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { 
+      type: String, 
+      required: function() {
+        return this.role !== 'worker';
+      }, 
+      unique: true, 
+      sparse: true, // Allows multiple null values for unique field
+      lowercase: true, 
+      trim: true 
+    },
     password: { type: String, minlength: 6, select: false },
     googleId: { type: String, unique: true, sparse: true },
     role: { 

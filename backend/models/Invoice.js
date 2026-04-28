@@ -10,38 +10,28 @@ const invoiceSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Please add an amount']
   },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    required: true
+  },
   contractor: {
-    type: mongoose.Schema.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  project: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'Project'
+  description: {
+    type: String,
+    trim: true
+  },
+  billImageUrl: {
+    type: String,
+    required: [true, 'Please upload an image of the bill']
   },
   status: {
     type: String,
-    enum: ['Pending', 'Approved', 'Rejected', 'Paid'],
-    default: 'Pending'
-  },
-  description: {
-    type: String
-  },
-  base64Data: {
-    type: String,
-    required: [true, 'Please upload an image or PDF of the invoice']
-  },
-  fileName: {
-    type: String,
-    required: true
-  },
-  fileType: {
-    type: String,
-    required: true
-  },
-  fileSize: {
-    type: Number,
-    required: true
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
   },
   date: {
     type: Date,

@@ -29,11 +29,14 @@ const protect = async (req, res, next) => {
 
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
+    console.log('AuthorizeRoles check - User role:', req.user.role, 'Required roles:', roles);
     if (!roles.includes(req.user.role)) {
+      console.log('Access denied for role:', req.user.role);
       return res.status(403).json({
         message: "Access denied"
       });
     }
+    console.log('Access granted for role:', req.user.role);
     next();
   };
 };

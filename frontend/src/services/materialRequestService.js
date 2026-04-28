@@ -1,48 +1,46 @@
 import api from './api';
 
-// Get all material requests
-const getMaterialRequests = async (params = {}) => {
-  const { data } = await api.get('/materials', { params });
-  return data;
-};
-
-// Get material request by ID
-const getMaterialRequestById = async (id) => {
-  const { data } = await api.get(`/materials/${id}`);
-  return data;
-};
-
-// Create material request
+// Create request
 const createMaterialRequest = async (requestData) => {
-  const { data } = await api.post('/materials', requestData);
+  const { data } = await api.post('/material-requests/request', requestData);
   return data;
 };
 
-// Update material request status
-const updateMaterialRequestStatus = async (id, updateData) => {
-  const { data } = await api.put(`/materials/${id}`, updateData);
+// Engineer approval
+const engineerApproval = async (id, approvalData) => {
+  const { data } = await api.put(`/material-requests/${id}/engineer-approval`, approvalData);
   return data;
 };
 
-// Get material requests for contractors
-const getMaterialRequestsForContractor = async () => {
-  const { data } = await api.get('/materials/contractor/assigned');
+// Contractor approval
+const contractorApproval = async (id, approvalData) => {
+  const { data } = await api.put(`/material-requests/${id}/contractor-approval`, approvalData);
   return data;
 };
 
-// Delete material request
-const deleteMaterialRequest = async (id) => {
-  const { data } = await api.delete(`/materials/${id}`);
+// Get all
+const getAllMaterialRequests = async (params = {}) => {
+  const { data } = await api.get('/material-requests', { params });
   return data;
 };
 
-const materialRequestService = {
-  getMaterialRequests,
-  getMaterialRequestById,
+// Get my requests
+const getMyMaterialRequests = async () => {
+  const { data } = await api.get('/material-requests/my-requests');
+  return data;
+};
+
+// Get project requests
+const getProjectMaterialRequests = async (projectId) => {
+  const { data } = await api.get(`/material-requests/project/${projectId}`);
+  return data;
+};
+
+export const materialRequestService = {
   createMaterialRequest,
-  updateMaterialRequestStatus,
-  getMaterialRequestsForContractor,
-  deleteMaterialRequest
+  engineerApproval,
+  contractorApproval,
+  getAllMaterialRequests,
+  getMyMaterialRequests,
+  getProjectMaterialRequests
 };
-
-export default materialRequestService;

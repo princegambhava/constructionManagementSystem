@@ -420,7 +420,7 @@ const NewProject = () => {
                 </div>
               </div>
             </div>
-          )}
+          
 
           {/* Submit Buttons */}
           <div className="flex justify-end space-x-4 pt-6">

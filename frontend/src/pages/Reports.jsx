@@ -156,7 +156,7 @@ const Reports = () => {
 };
 
 const ReportCard = ({ report }) => {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://construction-management-system-rm6t.vercel.app/api';
   const BACKEND_URL = API_BASE_URL.replace('/api', '');
 
   return (

@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const { uploadToCloudinary } = require('../config/cloudinary');
 
 const UPLOAD_DIR = path.join(__dirname, '../uploads/reports');
 
@@ -12,8 +13,8 @@ const ensureUploadDir = async () => {
   }
 };
 
-// Save file locally and return URL
-const saveFile = async (file, folder = 'reports') => {
+// Save file locally and return URL (fallback)
+const saveFileLocally = async (file, folder = 'reports') => {
   await ensureUploadDir();
   
   const timestamp = Date.now();
@@ -30,6 +31,22 @@ const saveFile = async (file, folder = 'reports') => {
     filename: fileName,
     path: filePath,
   };
+};
+
+// Save file using Cloudinary if configured, otherwise local storage
+const saveFile = async (file, folder = 'reports') => {
+  // Use Cloudinary if configured
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    try {
+      return await uploadToCloudinary(file.buffer, folder);
+    } catch (error) {
+      console.error('Cloudinary upload failed, falling back to local storage:', error);
+      return await saveFileLocally(file, folder);
+    }
+  }
+  
+  // Fallback to local storage
+  return await saveFileLocally(file, folder);
 };
 
 // Delete file

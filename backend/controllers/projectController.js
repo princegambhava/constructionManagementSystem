@@ -129,6 +129,50 @@ const createProject = async (req, res) => {
   }
 };
 
+// Get projects assigned to current Site Manager
+const getAssignedProjects = async (req, res) => {
+  try {
+    const { status, search } = req.query;
+    const userId = req.user._id || req.user.id;
+
+    console.log("Site Manager requesting assigned projects:", req.user);
+    console.log("Site Manager ID:", userId);
+
+    let filter = { siteManagers: { $in: [userId] } };
+
+    // Filter by status if provided
+    if (status) filter.status = status;
+    if (search) filter.name = { $regex: search, $options: 'i' };
+
+    console.log("Mongo filter for assigned projects:", filter);
+
+    const { page, limit, skip } = getPagination(req.query);
+    const [total, projects] = await Promise.all([
+      Project.countDocuments(filter),
+      Project.find(filter)
+        .populate("contractor", "name email")
+        .populate("engineers", "name email")
+        .populate("siteManagers", "name email")
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+    ]);
+
+    console.log("🔍 Total assigned projects found:", total);
+    console.log("🔍 Assigned projects returned:", projects.length);
+
+    return res.status(200).json({
+      data: projects,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    console.error("Error in getAssignedProjects:", error);
+    return res.status(500).json({
+      message: error.message
+    });
+  }
+};
+
 // Get all projects
 const getProjects = async (req, res) => {
   try {
@@ -426,6 +470,7 @@ const removeMilestone = async (req, res) => {
 module.exports = {
   createProject: asyncHandler(createProject),
   getProjects: asyncHandler(getProjects),
+  getAssignedProjects: asyncHandler(getAssignedProjects),
   getProject: asyncHandler(getProject),
   updateProject: asyncHandler(updateProject),
   deleteProject: asyncHandler(deleteProject),

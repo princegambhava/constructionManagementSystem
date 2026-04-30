@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const MaterialRequest = require("../models/MaterialRequest");
 const Project = require("../models/Project");
 const User = require("../models/User");
@@ -5,8 +6,8 @@ const Material = require("../models/Material");
 // Create material request (Site Manager only)
 const createMaterialRequest = async (req, res) => {
   try {
-    console.log("createMaterialRequest called by:", req.user.role);
-    console.log("Request body:", req.body);
+    console.log("🔍 DEBUG - createMaterialRequest called by:", req.user.role, req.user._id);
+    console.log("🔍 DEBUG - Request body:", JSON.stringify(req.body, null, 2));
 
     const {
       projectId,
@@ -16,32 +17,87 @@ const createMaterialRequest = async (req, res) => {
       description
     } = req.body;
 
-    // Validate required fields
-    if (!projectId || !materialName || !quantity || !unit) {
+    // Validate required fields with detailed error messages
+    const missingFields = [];
+    if (!projectId) missingFields.push("projectId");
+    if (!materialName) missingFields.push("materialName");
+    if (!quantity) missingFields.push("quantity");
+    if (!unit) missingFields.push("unit");
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
-        message: "Please provide all required fields: projectId, materialName, quantity, unit",
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+        missingFields,
+      });
+    }
+
+    // Validate field types
+    if (typeof projectId !== "string" || !mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        message: "Invalid projectId format",
+        field: "projectId",
+        received: projectId,
+      });
+    }
+
+    if (typeof materialName !== "string" || materialName.trim().length === 0) {
+      return res.status(400).json({
+        message: "materialName must be a non-empty string",
+        field: "materialName",
+        received: materialName,
+      });
+    }
+
+    if (isNaN(Number(quantity)) || Number(quantity) <= 0) {
+      return res.status(400).json({
+        message: "quantity must be a positive number",
+        field: "quantity",
+        received: quantity,
       });
     }
 
     // Verify project exists
     const projectDoc = await Project.findById(projectId);
     if (!projectDoc) {
-      return res.status(404).json({ message: "Project not found" });
+      return res.status(404).json({ 
+        message: "Project not found",
+        projectId,
+      });
+    }
+
+    console.log("🔍 DEBUG - Project found:", projectDoc.name);
+
+    // 🔒 AUTHORIZATION: Check if Site Manager is assigned to this project
+    if (req.user.role === "site_manager") {
+      const isAssigned = projectDoc.siteManagers.some(
+        (managerId) => managerId.toString() === req.user._id.toString()
+      );
+
+      if (!isAssigned) {
+        console.log("🔍 DEBUG - Site Manager NOT assigned to project");
+        return res.status(403).json({
+          message: "You can only create material requests for projects assigned to you",
+          projectId,
+          project: projectDoc.name,
+        });
+      }
+
+      console.log("🔍 DEBUG - Site Manager IS assigned to project");
     }
 
     // Create material request
     const materialRequest = new MaterialRequest({
-      projectId: projectId,
-      materialName: materialName,
+      projectId: new mongoose.Types.ObjectId(projectId), // Ensure ObjectId
+      materialName: materialName.trim(),
       quantity: Number(quantity),
       unit,
       description: description || "",
-      requestedBy: req.user._id,
-      status: "pending",
+      requestedBy: req.user._id, // Use logged-in user ID
+      status: "PENDING_ENGINEER_APPROVAL", // Correct status
     });
 
     await materialRequest.save();
-    console.log("Material request saved:", materialRequest);
+    console.log("🔍 DEBUG - Material request saved:", materialRequest._id);
 
     // Populate request details
     await materialRequest.populate([
@@ -54,8 +110,27 @@ const createMaterialRequest = async (req, res) => {
       materialRequest,
     });
   } catch (error) {
-    console.error("Error creating material request:", error);
-    res.status(500).json({ message: "Failed to create material request" });
+    console.error("🔍 DEBUG - Error creating material request:", error);
+    
+    // Handle specific errors
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: validationErrors,
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate material request detected",
+      });
+    }
+
+    res.status(500).json({ 
+      message: "Failed to create material request",
+      error: error.message,
+    });
   }
 };
 
@@ -77,9 +152,9 @@ const engineerApproval = async (req, res) => {
     }
 
     // Check if request is in pending status
-    if (materialRequest.status !== "pending") {
+    if (materialRequest.status !== "PENDING_ENGINEER_APPROVAL") {
       return res.status(400).json({
-        message: "Material request can only be approved/rejected when status is pending",
+        message: "Material request can only be approved/rejected when status is PENDING_ENGINEER_APPROVAL",
       });
     }
 
@@ -89,7 +164,7 @@ const engineerApproval = async (req, res) => {
     materialRequest.engineerRemarks = comments || "";
 
     // Update status based on engineer decision
-    materialRequest.status = approved ? "engineer-approved" : "engineer-rejected";
+    materialRequest.status = approved ? "ENGINEER_APPROVED" : "ENGINEER_REJECTED";
 
     await materialRequest.save();
 
@@ -128,7 +203,7 @@ const contractorApproval = async (req, res) => {
     }
 
     // Check if request is approved by engineer
-    if (materialRequest.status !== "engineer-approved") {
+    if (materialRequest.status !== "ENGINEER_APPROVED") {
       return res.status(400).json({
         message: "Material request can only be approved/rejected by contractor after engineer approval",
       });
@@ -140,7 +215,7 @@ const contractorApproval = async (req, res) => {
     materialRequest.contractorRemarks = comments || "";
 
     // Update status based on contractor decision
-    materialRequest.status = approved ? "contractor-approved" : "contractor-rejected";
+    materialRequest.status = approved ? "CONTRACTOR_APPROVED" : "CONTRACTOR_REJECTED";
 
     await materialRequest.save();
 
@@ -183,20 +258,38 @@ const getAllMaterialRequests = async (req, res) => {
     }
 
     else if (req.user.role === "engineer") {
+      // Engineer will use dedicated aggregation endpoint
+      // This fallback will only show basic requests without project filtering
       filter = {
-        status: "pending"
+        status: "PENDING_ENGINEER_APPROVAL"
       };
+      
+      console.log("🔍 Engineer basic filter - should use dedicated endpoint");
     }
 
     else if (req.user.role === "contractor") {
+      // Get projects assigned to this contractor
+      const assignedProjects = await Project.find({
+        contractor: req.user._id
+      }).select("_id");
+      
+      const projectIds = assignedProjects.map(p => p._id);
+      
       filter = {
-        status: "engineer_approved"
+        status: "ENGINEER_APPROVED", // Use correct status from schema
+        projectId: { $in: projectIds } // Only requests from assigned projects
       };
+      
+      console.log("🔍 Contractor filter:", {
+        status: filter.status,
+        projectCount: projectIds.length,
+        projectIds: projectIds.slice(0, 3)
+      });
     }
 
     // Override with query parameters if provided
     if (req.query.project) {
-      filter.project = req.query.project;
+      filter.projectId = req.query.project;
     }
 
     if (req.query.status) {
@@ -208,9 +301,10 @@ const getAllMaterialRequests = async (req, res) => {
     const total = await MaterialRequest.countDocuments(filter);
 
     const requests = await MaterialRequest.find(filter)
-      .populate("project", "name")
+      .populate("projectId", "name")
       .populate("requestedBy", "name email")
-      .populate("approvedBy", "name email")
+      .populate("engineerApprovedBy", "name email")
+      .populate("contractorApprovedBy", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -300,6 +394,187 @@ const getMyMaterialRequests = async (req, res) => {
   } catch (error) {
     console.error("Error fetching my material requests:", error);
     res.status(500).json({ message: "Failed to fetch material requests" });
+  }
+};
+
+// Get material requests for Engineer approval
+const getEngineerMaterialRequests = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    console.log("🔍 Engineer Material Requests - User:", req.user._id, req.user.role);
+
+    // Get projects assigned to this engineer
+    const assignedProjects = await Project.find({
+      engineers: { $in: [req.user._id] }
+    }).select("_id name");
+
+    const projectIds = assignedProjects.map(p => p._id);
+    
+    console.log("🔍 Engineer assigned projects:", {
+      count: projectIds.length,
+      projects: assignedProjects.map(p => p.name)
+    });
+
+    if (projectIds.length === 0) {
+      return res.status(200).json({
+        data: [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          totalPages: 0,
+        },
+        message: "No projects assigned to this engineer"
+      });
+    }
+
+    // Build filter for pending requests
+    const filter = {
+      status: "PENDING_ENGINEER_APPROVAL", // Requests waiting for engineer approval
+      projectId: { $in: projectIds }
+    };
+
+    if (status) filter.status = status;
+
+    console.log("🔍 Engineer filter:", filter);
+
+    // Use aggregation to ensure proper project filtering
+    const aggregationPipeline = [
+      {
+        $match: {
+          status: "PENDING_ENGINEER_APPROVAL",
+          projectId: { $in: projectIds }
+        }
+      },
+      {
+        $lookup: {
+          from: "projects",
+          localField: "projectId",
+          foreignField: "_id",
+          as: "projectInfo"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "requestedBy",
+          foreignField: "_id",
+          as: "requestedByInfo"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "engineerApprovedBy",
+          foreignField: "_id",
+          as: "engineerApprovedByInfo"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "contractorApprovedBy",
+          foreignField: "_id",
+          as: "contractorApprovedByInfo"
+        }
+      },
+      {
+        $unwind: "$projectInfo"
+      },
+      {
+        $unwind: "$requestedByInfo"
+      },
+      {
+        $addFields: {
+          projectId: "$projectInfo",
+          requestedBy: "$requestedByInfo",
+          engineerApprovedBy: { $ifNull: ["$engineerApprovedByInfo", null] },
+          contractorApprovedBy: { $ifNull: ["$contractorApprovedByInfo", null] }
+        }
+      },
+      {
+        $project: {
+          materialName: 1,
+          quantity: 1,
+          unit: 1,
+          description: 1,
+          status: 1,
+          requestDate: 1,
+          engineerRemarks: 1,
+          contractorRemarks: 1,
+          engineerApprovedAt: 1,
+          contractorApprovedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          projectId: {
+            _id: "$projectInfo._id",
+            name: "$projectInfo.name",
+            projectId: "$projectInfo.projectId"
+          },
+          requestedBy: {
+            _id: "$requestedByInfo._id",
+            name: "$requestedByInfo.name",
+            email: "$requestedByInfo.email"
+          },
+          engineerApprovedBy: {
+            $cond: {
+              if: { $ne: ["$engineerApprovedBy", []] },
+              then: {
+                _id: { $arrayElemAt: ["$engineerApprovedBy._id", 0] },
+                name: { $arrayElemAt: ["$engineerApprovedBy.name", 0] },
+                email: { $arrayElemAt: ["$engineerApprovedBy.email", 0] }
+              },
+              else: null
+            }
+          },
+          contractorApprovedBy: {
+            $cond: {
+              if: { $ne: ["$contractorApprovedBy", []] },
+              then: {
+                _id: { $arrayElemAt: ["$contractorApprovedBy._id", 0] },
+                name: { $arrayElemAt: ["$contractorApprovedBy.name", 0] },
+                email: { $arrayElemAt: ["$contractorApprovedBy.email", 0] }
+              },
+              else: null
+            }
+          }
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: parseInt(limit) }],
+          totalCount: [{ $count: "count" }]
+        }
+      }
+    ];
+
+    const result = await MaterialRequest.aggregate(aggregationPipeline);
+    const materialRequests = result[0].data;
+    const total = result[0].totalCount[0]?.count || 0;
+
+    console.log("🔍 Engineer requests found:", materialRequests.length);
+
+    res.status(200).json({
+      data: materialRequests,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      assignedProjects: assignedProjects.map(p => ({ id: p._id, name: p.name }))
+    });
+  } catch (error) {
+    console.error("🔍 Error fetching engineer material requests:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch engineer material requests",
+      error: error.message 
+    });
   }
 };
 
@@ -460,6 +735,7 @@ module.exports = {
   getAllMaterialRequests,
   getProjectMaterialRequests,
   getMyMaterialRequests,
+  getEngineerMaterialRequests,
   getMaterialRequestById,
   // Legacy functions
   getMaterialRequests,

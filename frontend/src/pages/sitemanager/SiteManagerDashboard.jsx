@@ -26,16 +26,17 @@ const SiteManagerDashboard = () => {
   // Status badge helper
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'submitted': 'bg-yellow-100 text-yellow-800',
-      'engineer-approved': 'bg-blue-100 text-blue-800',
-      'engineer-rejected': 'bg-red-100 text-red-800',
-      'contractor-approved': 'bg-green-100 text-green-800',
-      'contractor-rejected': 'bg-red-100 text-red-800',
-      'purchased': 'bg-purple-100 text-purple-800',
-      'delivered': 'bg-green-100 text-green-800'
+      'PENDING_ENGINEER_APPROVAL': 'bg-yellow-100 text-yellow-800',
+      'PENDING_CONTRACTOR_APPROVAL': 'bg-orange-100 text-orange-800',
+      'ENGINEER_APPROVED': 'bg-blue-100 text-blue-800',
+      'ENGINEER_REJECTED': 'bg-red-100 text-red-800',
+      'CONTRACTOR_APPROVED': 'bg-green-100 text-green-800',
+      'CONTRACTOR_REJECTED': 'bg-red-100 text-red-800',
+      'PURCHASED': 'bg-purple-100 text-purple-800',
+      'DELIVERED': 'bg-green-100 text-green-800'
     };
     
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const displayStatus = status.replace(/_/g, ' ');
     
     return (
       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[status] || 'bg-gray-100 text-gray-800'}`}>
@@ -753,11 +754,14 @@ const SiteManagerDashboard = () => {
                     className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="ordered">Ordered</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="completed">Completed</option>
+                    <option value="PENDING_ENGINEER_APPROVAL">Pending Engineer Approval</option>
+                    <option value="PENDING_CONTRACTOR_APPROVAL">Pending Contractor Approval</option>
+                    <option value="ENGINEER_APPROVED">Engineer Approved</option>
+                    <option value="ENGINEER_REJECTED">Engineer Rejected</option>
+                    <option value="CONTRACTOR_APPROVED">Contractor Approved</option>
+                    <option value="CONTRACTOR_REJECTED">Contractor Rejected</option>
+                    <option value="PURCHASED">Purchased</option>
+                    <option value="DELIVERED">Delivered</option>
                   </select>
                 </div>
               </div>
@@ -792,22 +796,44 @@ const SiteManagerDashboard = () => {
                               Project: {request.projectId?.name || "N/A"}
                             </p>
                           </div>
-                          <span
-                            className={`px-3 py-1 text-xs rounded-full font-medium ${
-                              request.status === "pending"
-                                ? "bg-yellow-100 text-yellow-600"
-                                : request.status === "engineer_approved"
-                                  ? "bg-blue-100 text-blue-600"
-                                  : request.status === "approved"
-                                    ? "bg-green-100 text-green-600"
-                                    : "bg-red-100 text-red-600"
-                            }`}
-                          >
-                            {request.status === "engineer_approved"
-                              ? "Engineer Approved"
-                              : request.status.charAt(0).toUpperCase() +
-                                request.status.slice(1).replace("_", " ")}
-                          </span>
+                          {getStatusBadge(request.status)}
+                        
+                        {/* Status Flow Indicator */}
+                        {request.status === "PENDING_ENGINEER_APPROVAL" && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            ⏳ Waiting for engineer technical review
+                          </div>
+                        )}
+                        {request.status === "ENGINEER_REJECTED" && (
+                          <div className="mt-2 text-xs text-red-600">
+                            ❌ Request rejected by engineer - please submit new request
+                          </div>
+                        )}
+                        {request.status === "ENGINEER_APPROVED" && (
+                          <div className="mt-2 text-xs text-blue-600">
+                            ⏳ Engineer approved - waiting for contractor review
+                          </div>
+                        )}
+                        {request.status === "CONTRACTOR_REJECTED" && (
+                          <div className="mt-2 text-xs text-red-600">
+                            ❌ Request rejected by contractor - please submit new request
+                          </div>
+                        )}
+                        {request.status === "CONTRACTOR_APPROVED" && (
+                          <div className="mt-2 text-xs text-green-600">
+                            ✅ Contractor approved - processing order
+                          </div>
+                        )}
+                        {request.status === "PURCHASED" && (
+                          <div className="mt-2 text-xs text-purple-600">
+                            📦 Materials purchased - awaiting delivery
+                          </div>
+                        )}
+                        {request.status === "DELIVERED" && (
+                          <div className="mt-2 text-xs text-green-600">
+                            ✅ Materials delivered - request complete
+                          </div>
+                        )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -841,7 +867,7 @@ const SiteManagerDashboard = () => {
                         )}
 
                         {/* Engineer Approval Info */}
-                        {request.engineerApproval && (
+                        {(request.status === "ENGINEER_APPROVED" || request.status === "ENGINEER_REJECTED") && (
                           <div className="mb-4 p-3 bg-blue-50 rounded">
                             <div className="text-sm">
                               <span className="font-medium text-blue-700">
@@ -849,32 +875,33 @@ const SiteManagerDashboard = () => {
                               </span>
                               <span
                                 className={
-                                  request.engineerApproval.approved
+                                  request.status === "ENGINEER_APPROVED"
                                     ? "text-green-600"
                                     : "text-red-600"
                                 }
                               >
-                                {request.engineerApproval.approved
+                                {request.status === "ENGINEER_APPROVED"
                                   ? "Approved"
                                   : "Rejected"}
                               </span>
-                              {request.engineerApproval.comments && (
+                              {request.engineerRemarks && (
                                 <span className="block text-gray-600 mt-1">
-                                  "{request.engineerApproval.comments}"
+                                  "{request.engineerRemarks}"
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                              By: {request.technicalApprovedBy?.name} •{" "}
-                              {new Date(
-                                request.engineerApproval.approvedAt,
-                              ).toLocaleDateString()}
+                              By: {request.engineerApprovedBy?.name} •{" "}
+                              {request.engineerApprovedAt &&
+                                new Date(
+                                  request.engineerApprovedAt,
+                                ).toLocaleDateString()}
                             </p>
                           </div>
                         )}
 
                         {/* Contractor Approval Info */}
-                        {request.contractorApproval && (
+                        {(request.status === "CONTRACTOR_APPROVED" || request.status === "CONTRACTOR_REJECTED") && (
                           <div className="mb-4 p-3 bg-green-50 rounded">
                             <div className="text-sm">
                               <span className="font-medium text-green-700">
@@ -882,26 +909,27 @@ const SiteManagerDashboard = () => {
                               </span>
                               <span
                                 className={
-                                  request.contractorApproval.approved
+                                  request.status === "CONTRACTOR_APPROVED"
                                     ? "text-green-600"
                                     : "text-red-600"
                                 }
                               >
-                                {request.contractorApproval.approved
+                                {request.status === "CONTRACTOR_APPROVED"
                                   ? "Approved"
                                   : "Rejected"}
                               </span>
-                              {request.contractorApproval.comments && (
+                              {request.contractorRemarks && (
                                 <span className="block text-gray-600 mt-1">
-                                  "{request.contractorApproval.comments}"
+                                  "{request.contractorRemarks}"
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                              By: {request.finalApprovedBy?.name} •{" "}
-                              {new Date(
-                                request.contractorApproval.approvedAt,
-                              ).toLocaleDateString()}
+                              By: {request.contractorApprovedBy?.name} •{" "}
+                              {request.contractorApprovedAt &&
+                                new Date(
+                                  request.contractorApprovedAt,
+                                ).toLocaleDateString()}
                             </p>
                           </div>
                         )}
@@ -910,21 +938,26 @@ const SiteManagerDashboard = () => {
                           <div className="text-sm text-gray-500">
                             Status:{" "}
                             <span className="font-medium">
-                              {request.status.replace("_", " ")}
+                              {request.status.replace(/_/g, " ")}
                             </span>
                           </div>
-                          {request.status === "pending" && (
+                          {(request.status === "PENDING_ENGINEER_APPROVAL") && (
                             <button
                               onClick={() =>
                                 handleUpdateRequestStatus(
                                   request._id,
-                                  "cancelled",
+                                  "CANCELLED",
                                 )
                               }
                               className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
                             >
                               Cancel Request
                             </button>
+                          )}
+                          {(request.status === "ENGINEER_REJECTED" || request.status === "CONTRACTOR_REJECTED") && (
+                            <span className="text-xs text-red-600 font-medium">
+                              Request Rejected
+                            </span>
                           )}
                         </div>
                       </div>
@@ -950,7 +983,7 @@ const SiteManagerDashboard = () => {
                 </div>
                 <div className="text-2xl font-bold text-green-700">
                   {invoices.filter((inv) => inv.status === "Approved").length +
-                    materialRequests.filter((req) => req.status === "completed")
+                    materialRequests.filter((req) => req.status === "DELIVERED")
                       .length}
                 </div>
               </div>
@@ -964,7 +997,7 @@ const SiteManagerDashboard = () => {
                       .filter((inv) => inv.status === "Approved")
                       .reduce((sum, inv) => sum + (inv.amount || 0), 0) +
                       materialRequests
-                        .filter((req) => req.status === "completed")
+                        .filter((req) => req.status === "DELIVERED")
                         .reduce(
                           (sum, req) =>
                             sum + (req.actualCost || req.budget || 0),

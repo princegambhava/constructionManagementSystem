@@ -16,17 +16,17 @@ const EngineerDashboard = () => {
   // Status badge helper
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'submitted': 'bg-yellow-100 text-yellow-800',
-      'engineer-approved': 'bg-blue-100 text-blue-800',
-      'engineer-rejected': 'bg-red-100 text-red-800',
-      'contractor-approved': 'bg-green-100 text-green-800',
-      'contractor-rejected': 'bg-red-100 text-red-800',
-      'purchased': 'bg-purple-100 text-purple-800',
-      'delivered': 'bg-green-100 text-green-800'
+      'PENDING_ENGINEER_APPROVAL': 'bg-yellow-100 text-yellow-800',
+      'PENDING_CONTRACTOR_APPROVAL': 'bg-orange-100 text-orange-800',
+      'ENGINEER_APPROVED': 'bg-blue-100 text-blue-800',
+      'ENGINEER_REJECTED': 'bg-red-100 text-red-800',
+      'CONTRACTOR_APPROVED': 'bg-green-100 text-green-800',
+      'CONTRACTOR_REJECTED': 'bg-red-100 text-red-800',
+      'PURCHASED': 'bg-purple-100 text-purple-800',
+      'DELIVERED': 'bg-green-100 text-green-800'
     };
     
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const displayStatus = status.replace(/_/g, ' ');
     
     return (
       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[status] || 'bg-gray-100 text-gray-800'}`}>
@@ -60,7 +60,7 @@ const EngineerDashboard = () => {
         projectService.getProjects(), // Backend will filter by role
         blueprintService.getBlueprints(),
         taskService.getTasks(),
-        materialRequestService.getAllMaterialRequests() // Backend will filter by role
+        materialRequestService.getEngineerMaterialRequests() // Use specific engineer endpoint
       ]);
       
       console.log('Projects Response:', projectsRes);
@@ -72,8 +72,8 @@ const EngineerDashboard = () => {
       setBlueprints(blueprintsRes);
       // Filter for 'Completed' status which needs verification
       setTasksToCheck(tasksRes.filter(t => t.status === 'Completed'));
-      setMaterialRequests(materialRequestsRes.materialRequests || []);
-      console.log('Set Material Requests:', materialRequestsRes.materialRequests || []);
+      setMaterialRequests(materialRequestsRes.data || []);
+      console.log('Set Material Requests:', materialRequestsRes.data || []);
     } catch (error) {
       console.error('Error in fetchData:', error);
     } finally {
@@ -264,7 +264,7 @@ const EngineerDashboard = () => {
 
                   <div className="flex justify-between items-center pt-4 border-t border-gray-200">
                     <div className="text-sm text-gray-500">
-                      Status: <span className="font-medium">{request.status.replace('_', ' ')}</span>
+                      Status: <span className="font-medium">{request.status.replace(/_/g, ' ')}</span>
                     </div>
                     <div className="flex gap-2">
                       <button 

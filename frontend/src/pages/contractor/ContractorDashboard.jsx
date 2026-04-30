@@ -29,16 +29,17 @@ const ContractorDashboard = () => {
   // Status badge helper
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'submitted': 'bg-yellow-100 text-yellow-800',
-      'engineer-approved': 'bg-blue-100 text-blue-800',
-      'engineer-rejected': 'bg-red-100 text-red-800',
-      'contractor-approved': 'bg-green-100 text-green-800',
-      'contractor-rejected': 'bg-red-100 text-red-800',
-      'purchased': 'bg-purple-100 text-purple-800',
-      'delivered': 'bg-green-100 text-green-800'
+      'PENDING_ENGINEER_APPROVAL': 'bg-yellow-100 text-yellow-800',
+      'PENDING_CONTRACTOR_APPROVAL': 'bg-orange-100 text-orange-800',
+      'ENGINEER_APPROVED': 'bg-blue-100 text-blue-800',
+      'ENGINEER_REJECTED': 'bg-red-100 text-red-800',
+      'CONTRACTOR_APPROVED': 'bg-green-100 text-green-800',
+      'CONTRACTOR_REJECTED': 'bg-red-100 text-red-800',
+      'PURCHASED': 'bg-purple-100 text-purple-800',
+      'DELIVERED': 'bg-green-100 text-green-800'
     };
     
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const displayStatus = status.replace(/_/g, ' ');
     
     return (
       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusConfig[status] || 'bg-gray-100 text-gray-800'}`}>
@@ -85,7 +86,7 @@ const ContractorDashboard = () => {
       ] = await Promise.all([
         projectService.getProjects(), // Backend will filter by role
         taskService.getTasks(),
-        materialRequestService.getAllMaterialRequests(),
+        materialRequestService.getContractorMaterialRequests(),
         userService.getAll({ role: "engineer" }),
         userService.getAll({ role: "site_manager" }),
       ]);
@@ -97,7 +98,7 @@ const ContractorDashboard = () => {
 
       setProjects(Array.isArray(projects) ? projects : []);
       setTasks(tasksRes.data || tasksRes);
-      setMaterialRequests(materialRequestsRes.materialRequests || []);
+      setMaterialRequests(materialRequestsRes.data || []);
       setEngineers(engineersRes.data || engineersRes);
       setSiteManagers(siteManagersRes.data || siteManagersRes);
     } catch (error) {
@@ -259,6 +260,21 @@ const ContractorDashboard = () => {
                            error?.response?.data?.error || 
                            error?.message || 
                            'Failed to process approval';
+      alert(`Error: ${errorMessage}`);
+    }
+  };
+
+  const handleStatusUpdate = async (requestId, status) => {
+    try {
+      await materialRequestService.updateRequestStatus(requestId, { status });
+      alert(`Material request status updated to ${status.replace(/_/g, ' ')} successfully!`);
+      fetchData();
+    } catch (error) {
+      console.error('Status update error:', error);
+      const errorMessage = error?.response?.data?.message || 
+                           error?.response?.data?.error || 
+                           error?.message || 
+                           'Failed to update status';
       alert(`Error: ${errorMessage}`);
     }
   };
@@ -784,7 +800,7 @@ const ContractorDashboard = () => {
                           {new Date(request.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {request.status === "engineer-approved" && (
+                          {request.status === "ENGINEER_APPROVED" && (
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleContractorApproval(request._id, true)}
@@ -797,6 +813,22 @@ const ContractorDashboard = () => {
                                 className="text-red-600 hover:text-red-800 text-sm"
                               >
                                 Reject
+                              </button>
+                            </div>
+                          )}
+                          {request.status === "CONTRACTOR_APPROVED" && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleStatusUpdate(request._id, "PURCHASED")}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                Mark Purchased
+                              </button>
+                              <button
+                                onClick={() => handleStatusUpdate(request._id, "DELIVERED")}
+                                className="text-green-600 hover:text-green-800 text-sm"
+                              >
+                                Mark Delivered
                               </button>
                             </div>
                           )}

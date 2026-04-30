@@ -55,18 +55,19 @@ const materialRequestSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        "submitted",
-        "engineer-approved",
-        "engineer-rejected",
-        "contractor-approved",
-        "contractor-rejected",
-        "purchased",
-        "delivered"
+        "PENDING_ENGINEER_APPROVAL",
+        "PENDING_CONTRACTOR_APPROVAL",
+        "ENGINEER_APPROVED",
+        "ENGINEER_REJECTED",
+        "CONTRACTOR_APPROVED",
+        "CONTRACTOR_REJECTED",
+        "PURCHASED",
+        "DELIVERED"
       ],
-      default: "submitted"
+      default: "PENDING_ENGINEER_APPROVAL"
     },
 
-    // Engineer approval
+    // Engineer approval fields
     engineerApprovedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
@@ -81,7 +82,7 @@ const materialRequestSchema = new mongoose.Schema(
       trim: true
     },
 
-    // Contractor approval
+    // Contractor approval fields
     contractorApprovedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
@@ -101,7 +102,7 @@ const materialRequestSchema = new mongoose.Schema(
       default: Date.now
     },
 
-    // Optional / legacy fields
+    // Legacy fields for compatibility
     title: {
       type: String,
       trim: true
@@ -126,29 +127,6 @@ const materialRequestSchema = new mongoose.Schema(
       default: "medium"
     },
 
-    project: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project"
-    },
-
-    siteManager: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
-    },
-
-    assignedContractor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
-    },
-
-    estimatedDelivery: {
-      type: Date
-    },
-
-    actualDelivery: {
-      type: Date
-    },
-
     notes: {
       type: String,
       trim: true
@@ -169,5 +147,6 @@ const materialRequestSchema = new mongoose.Schema(
 materialRequestSchema.index({ projectId: 1, status: 1 });
 materialRequestSchema.index({ requestedBy: 1 });
 materialRequestSchema.index({ status: 1 });
+materialRequestSchema.index({ "projectId": 1, "status": 1, "createdAt": -1 });
 
 module.exports = mongoose.model("MaterialRequest", materialRequestSchema);

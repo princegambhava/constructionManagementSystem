@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { materialRequestService } from "../services/materialRequestService";
 import { projectService } from "../services/projectService";
+import { getStatusDisplay, getStatusBadgeClass, canEngineerReview, canContractorReview } from "../utils/statusUtils";
 import Loader from "../components/Loader";
 import ErrorAlert from "../components/ErrorAlert";
 import SuccessAlert from "../components/SuccessAlert";
@@ -41,8 +42,16 @@ const Materials = () => {
       if (filterProject) params.project = filterProject;
       if (filterStatus) params.status = filterStatus;
 
-      const response =
-        await materialRequestService.getAllMaterialRequests(params);
+      let response;
+      
+      // Use role-specific API calls
+      if (user?.role === 'engineer') {
+        console.log("🔍 Using engineer-specific API");
+        response = await materialRequestService.getEngineerMaterialRequests(params);
+      } else {
+        console.log("🔍 Using general API for role:", user?.role);
+        response = await materialRequestService.getAllMaterialRequests(params);
+      }
 
       const requests = Array.isArray(response)
         ? response
@@ -50,7 +59,14 @@ const Materials = () => {
 
       setMaterialRequests(requests);
       setTotalPages(response.pagination?.totalPages || 1);
+      
+      console.log("🔍 Material requests loaded:", {
+        role: user?.role,
+        count: requests.length,
+        totalPages: response.pagination?.totalPages || 1
+      });
     } catch (err) {
+      console.error("🔍 Error loading material requests:", err.response?.data);
       setError(
         err.response?.data?.message || "Failed to load material requests"
       );
@@ -61,15 +77,26 @@ const Materials = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await projectService.getProjects();
+      let projectList;
+      
+      // Use assigned projects API for Site Managers, regular API for others
+      if (user?.role === 'site_manager') {
+        projectList = await projectService.getAssignedProjects({ limit: 100 });
+      } else {
+        projectList = await projectService.getProjects({ limit: 100 });
+      }
 
-      const projectList = Array.isArray(response)
-        ? response
-        : response.data || [];
+      const projects = Array.isArray(projectList)
+        ? projectList
+        : projectList.data || [];
 
-      setProjects(projectList);
+      setProjects(projects);
     } catch (err) {
       console.error("Failed to load projects:", err);
+      // If Site Manager gets 403, it means no projects assigned
+      if (err.response?.status === 403 && user?.role === 'site_manager') {
+        setProjects([]);
+      }
     }
   };
 
@@ -282,21 +309,14 @@ const MaterialCard = ({
   const [showStatusModal, setShowStatusModal] =
     useState(false);
 
-  const badgeClass =
-    material.status === "approved"
-      ? "bg-green-100 text-green-800"
-      : material.status === "rejected"
-      ? "bg-red-100 text-red-800"
-      : material.status === "delivered"
-      ? "bg-blue-100 text-blue-800"
-      : "bg-yellow-100 text-yellow-800";
+  const badgeClass = getStatusBadgeClass(material.status);
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900">
-            {material.name}
+            {material.materialName || material.name}
           </h3>
 
           <p className="mt-1 text-sm text-gray-600">
@@ -304,7 +324,7 @@ const MaterialCard = ({
           </p>
 
           <p className="mt-1 text-sm text-gray-600">
-            Project: {material.project?.name || "N/A"}
+            Project: {material.projectId?.name || "N/A"}
           </p>
 
           {material.notes && (
@@ -326,39 +346,44 @@ const MaterialCard = ({
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${badgeClass}`}
           >
-            {material.status}
+            {getStatusDisplay(material.status)}
           </span>
+          
+          {/* Debug info - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <span className="text-xs text-gray-400 mt-1">
+              ID: {material._id?.slice(-6)}
+            </span>
+          )}
 
-          {canReview &&
-            material.status === "pending" && (
-              <div className="flex gap-2">
-                <button
-                  onClick={onApprove}
-                  className="rounded-md bg-green-600 px-3 py-1 text-xs text-white"
-                >
-                  Approve
-                </button>
-
-                <button
-                  onClick={onReject}
-                  className="rounded-md bg-red-600 px-3 py-1 text-xs text-white"
-                >
-                  Reject
-                </button>
-              </div>
-            )}
-
-          {canUpdateStatus &&
-            material.status === "approved" && (
+          {canReview && canEngineerReview(material.status) && (
+            <div className="flex gap-2">
               <button
-                onClick={() =>
-                  setShowStatusModal(true)
-                }
-                className="rounded-md bg-blue-600 px-3 py-1 text-xs text-white"
+                onClick={onApprove}
+                className="rounded-md bg-green-600 px-3 py-1 text-xs text-white"
               >
-                Update Status
+                Approve
               </button>
-            )}
+
+              <button
+                onClick={onReject}
+                className="rounded-md bg-red-600 px-3 py-1 text-xs text-white"
+              >
+                Reject
+              </button>
+            </div>
+          )}
+
+          {canUpdateStatus && canContractorReview(material.status) && (
+            <button
+              onClick={() =>
+                setShowStatusModal(true)
+              }
+              className="rounded-md bg-blue-600 px-3 py-1 text-xs text-white"
+            >
+              Update Status
+            </button>
+          )}
         </div>
       </div>
 
@@ -385,6 +410,7 @@ const MaterialRequestModal = ({
   onClose,
   onSuccess,
 }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     project: "",
     name: "",
@@ -396,18 +422,34 @@ const MaterialRequestModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Check if Site Manager has no assigned projects
+  const isSiteManagerWithNoProjects = user?.role === 'site_manager' && projects.length === 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
       setLoading(true);
 
-      await materialRequestService.createMaterialRequest(
-        formData
-      );
+      // Map frontend form data to backend expected format
+      const payload = {
+        projectId: formData.project,
+        materialName: formData.name,
+        quantity: Number(formData.quantity),
+        unit: formData.unit,
+        description: formData.notes || "", // Map notes to description
+      };
+
+      // DEBUG: Log payload before sending
+      console.log("🔍 DEBUG - Original form data:", formData);
+      console.log("🔍 DEBUG - Mapped payload:", JSON.stringify(payload, null, 2));
+      console.log("🔍 DEBUG - Payload keys:", Object.keys(payload));
+
+      await materialRequestService.createMaterialRequest(payload);
 
       onSuccess();
     } catch (err) {
+      console.error("🔍 DEBUG - Error response:", err.response?.data);
       setError(
         err.response?.data?.message ||
           "Failed to submit request"
@@ -431,10 +473,17 @@ const MaterialRequestModal = ({
           />
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-4 space-y-4"
-        >
+        {isSiteManagerWithNoProjects ? (
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800">
+              You have no projects assigned to you. Please contact your administrator to get projects assigned before requesting materials.
+            </p>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            className="mt-4 space-y-4"
+          >
           <select
             required
             value={formData.project}
@@ -530,8 +579,8 @@ const MaterialRequestModal = ({
 
             <button
               type="submit"
-              disabled={loading}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white"
+              disabled={loading || isSiteManagerWithNoProjects}
+              className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {loading
                 ? "Submitting..."
@@ -539,6 +588,7 @@ const MaterialRequestModal = ({
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

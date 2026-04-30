@@ -62,5 +62,19 @@ export const projectService = {
       siteManagers: siteManagerIds
     });
     return data;
+  },
+
+  getAssignedProjects: async (params = {}) => {
+    const { data } = await api.get("/projects/assigned", { params });
+    console.log("🔍 Assigned projects API response:", data);
+    
+    // Return the projects array with safe ID mapping
+    const projects = (data.data || []).map(project => ({
+      ...project,
+      _id: project._id || project.id
+    }));
+    
+    console.log("🔍 Mapped assigned projects:", projects);
+    return projects;
   }
 };

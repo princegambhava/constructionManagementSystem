@@ -1,3 +1,4 @@
+
 const express = require('express');
 const { body } = require('express-validator');
 const {
@@ -11,7 +12,9 @@ const {
   addMilestone,
   updateMilestone,
   removeMilestone,
+  getAssignedProjects,
 } = require('../controllers/projectController');
+const { getAssignedProjects: smGetProjects } = require('../controllers/siteManagerController');
 const { protect } = require('../middleware/authMiddleware');
 const authorize = require('../middleware/authorize');
 const validate = require('../middleware/validate');
@@ -28,6 +31,7 @@ router.post(
 );
 
 router.get('/', protect, getProjects); // All authenticated users can see projects (filtered by role)
+router.get('/assigned', protect, authorize('site_manager'), smGetProjects); // Only site managers can get their assigned projects
 router.get('/:id', protect, getProject); // All authenticated users can view project details
 
 router.put(
